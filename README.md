@@ -499,7 +499,7 @@ ListView.builder(
 
 ### Scrollable view
 
-Be sure you have in the root widget:
+Be sure you have as root widget in body definition:
 
 ``` dart
 SingleChildScrollView(
