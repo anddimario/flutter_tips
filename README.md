@@ -84,7 +84,350 @@ class MyClassState extends State<ResultCard> {
 
 Then: `MyClass _myinstance = new MyClass(myField: "myValue");` 
 
-## Create a list based on array of results:
+## Provider (manage state change)
+
+**Reference**: <https://alligator.io/flutter/state-management/>
+
+Dependencies: [provider](https://pub.dev/packages/provider)
+
+<details>
+  <summary>lib/shared/provider.dart</summary>
+
+``` dart
+import 'package:flutter/material.dart';
+
+class Data extends ChangeNotifier {
+  Map data = {};
+
+  void updateData(input) {
+    data = input;
+    notifyListeners();
+  }
+}
+
+```
+
+</details>
+
+<details>
+  <summary>lib/main.dart</summary>
+
+``` dart
+import 'package:mypackage/shared/provider.dart';
+...
+class _MyHomePageState extends State<MyHomePage> {
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<Data>(
+      ...
+    )
+  }
+}
+```
+
+</details>
+
+<details>
+  <summary>use provider</summary>
+
+``` dart
+import 'package:provider/provider.dart';
+import 'package:mypackage/shared/provider.dart';
+...
+// Update data in provider
+Provider.of<Data>(context).updateData({...});
+// Get data from provider
+print(Provider.of<Data>(context).data['myfield']);
+```
+
+</details>
+
+## Multilanguage
+
+**Reference**: <https://medium.com/flutter-community/flutter-internationalization-the-easy-way-using-provider-and-json-c47caa4212b2>
+**NOTE**: This example use multiple provider that allow a different provider for data management (similar to the code in the `Provider` section)
+
+Dependencies: [provider](https://pub.dev/packages/provider), [shared_preferences](https://pub.dev/packages/shared_preferences)
+
+Create your locale files as json in `locale/` and remember to add them in `assets` section in `pubspec.yaml` .
+
+<details>
+  <summary>locale/en.json</summary>
+
+``` json
+{
+  "welcome": "Welcome!"
+}
+```
+
+</details>
+
+<details>
+  <summary>shared/provider.dart</summary>
+
+``` dart
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+...
+
+class AppLanguage extends ChangeNotifier {
+  Locale _appLocale = Locale('en');
+
+  Locale get appLocal => _appLocale ?? Locale("en");
+  fetchLocale() async {
+    var prefs = await SharedPreferences.getInstance();
+
+    if (prefs.getString('language_code') == null) {
+      _appLocale = Locale('en');
+      return Null;
+    }
+    _appLocale = Locale(prefs.getString('language_code'));
+    return Null;
+  }
+
+  void changeLanguage(Locale type) async {
+    var prefs = await SharedPreferences.getInstance();
+    if (_appLocale == type) {
+      return;
+    }
+    if (type == Locale("it")) {
+      _appLocale = Locale("it");
+      await prefs.setString('language_code', 'it');
+      await prefs.setString('countryCode', 'IT');
+    } else {
+      _appLocale = Locale("en");
+      await prefs.setString('language_code', 'en');
+      await prefs.setString('countryCode', 'US');
+    }
+    notifyListeners();
+  }
+}
+```
+
+</details>
+
+<details>
+  <summary>lib/shared/localization.dart</summary>
+
+``` dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // for rootBundle
+import 'dart:convert'; // for json
+
+class AppLocalizations {
+  final Locale locale;
+
+  AppLocalizations(this.locale);
+
+  // Helper method to keep the code in the widgets concise
+  // Localizations are accessed using an InheritedWidget "of" syntax
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations);
+  }
+
+  // Static member to have a simple access to the delegate from the MaterialApp
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+  _AppLocalizationsDelegate();
+
+  Map<String, String> _localizedStrings;
+
+  Future<bool> load() async {
+    // Load the language JSON file from the "lang" folder
+    String jsonString =
+    await rootBundle.loadString('locale/${locale.languageCode}.json');
+    Map<String, dynamic> jsonMap = json.decode(jsonString);
+
+    _localizedStrings = jsonMap.map((key, value) {
+      return MapEntry(key, value.toString());
+    });
+
+    return true;
+  }
+
+  // This method will be called from every widget which needs a localized text
+  String translate(String key) {
+    return _localizedStrings[key];
+  }
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  // This delegate instance will never change (it doesn't even have fields!)
+  // It can provide a constant constructor.
+  const _AppLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) {
+    // Include all of your supported language codes here
+    return ['en', 'it'].contains(locale.languageCode);
+  }
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async {
+    // AppLocalizations class is where the JSON loading actually runs
+    AppLocalizations localizations = new AppLocalizations(locale);
+    await localizations.load();
+    return localizations;
+  }
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+```
+
+</details>
+
+<details>
+  <summary>lib/main.dart</summary>
+
+``` dart
+...
+
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
+import 'package:mypackage/shared/localization.dart';
+import 'package:mypackage/shared/provider.dart';
+...
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // avoid error
+  AppLanguage appLanguage = AppLanguage();
+  await appLanguage.fetchLocale();
+  runApp(MyApp(
+    appLanguage: appLanguage,
+  ));
+//  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  final AppLanguage appLanguage;
+
+  MyApp({this.appLanguage});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+        providers: [
+          ChangeNotifierProvider<Data>(
+            create: (context) => Data(),
+          ),
+          ChangeNotifierProvider<AppLanguage>(
+            create: (context) => AppLanguage(),
+          ),
+        ],
+        child: Consumer<AppLanguage>(builder: (context, model, child) {
+          return MaterialApp(
+            locale: model.appLocal,
+            title: 'Title',
+            theme: ThemeData(
+              primarySwatch: Colors.blue,
+            ),
+            supportedLocales: [
+              Locale('en', 'US'),
+              Locale('it', 'IT'),
+            ],
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            home: MyHomePage(title: 'Title'),
+            navigatorObservers: <NavigatorObserver>[observer],
+          );
+        }));
+  }
+}
+
+```
+
+</details>
+
+</details>
+<details>
+  <summary>lib/pages/settings.dart (optional settings page)</summary>
+
+``` dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:mypackage/shared/provider.dart';
+import 'package:mypackage/shared/localization.dart';
+
+class SettingsPage extends StatefulWidget {
+  final String title = 'Settings';
+
+  @override
+  State<StatefulWidget> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  String _selectedLanguage;
+  List _availableLanguages = ["en", "it"];
+
+  List<DropdownMenuItem<String>> _dropDownMenuItems;
+
+  @override
+  void initState() {
+    _dropDownMenuItems = getDropDownMenuItems();
+    _selectedLanguage = _dropDownMenuItems[0].value;
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      body: Builder(builder: (BuildContext context) {
+        return ListView(
+          scrollDirection: Axis.vertical,
+          children: <Widget>[
+            Text(AppLocalizations.of(context).translate('language')),
+            Center(
+              child: new DropdownButton(
+                value: _selectedLanguage,
+                items: _dropDownMenuItems,
+                onChanged: changedDropDownItem,
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  List<DropdownMenuItem<String>> getDropDownMenuItems() {
+    List<DropdownMenuItem<String>> items = new List();
+    for (String role in _availableLanguages) {
+      items.add(new DropdownMenuItem(value: role, child: new Text(role)));
+    }
+    return items;
+  }
+
+  void changedDropDownItem(String selectedLanguage) {
+    var appLanguage = Provider.of<AppLanguage>(context);
+    appLanguage.changeLanguage(Locale(selectedLanguage));
+    setState(() {
+      _selectedLanguage = selectedLanguage;
+    });
+  }
+}
+```
+
+</details>
+
+<details>
+  <summary>use translation</summary>
+
+``` dart
+import 'package:mypackage/shared/localization.dart';
+...
+print(AppLocalizations.of(context).translate('welcome'));
+```
+
+</details>
+
+## Create a list based on array of results
 
 <details>
   <summary>Code</summary>
@@ -130,7 +473,11 @@ ListView.builder(
 
 ## Layout
 
-### **Stack** widget is useful to create overlap widgets
+### Progress
+
+* circular loading widget: `CircularProgressIndicator()` 
+
+### Stack widget is useful to create overlap widgets
 
 <details>
 <summary>Code</summary>
@@ -171,7 +518,7 @@ Visibility(
 )
 ```
 
-**Explain**: `CONDITION` is a that return `true` 
+**Explain**: `CONDITION` must return `true` or `false` 
 You can use this method to return a widget based on condition:
 
 ``` dart
@@ -292,7 +639,7 @@ QuerySnapshot request = await Firestore.instance
   .where('field', isEqualTo: "value")
   .limit(10) // optional
   .getDocuments();
-List<Tip> docs = request.documents
+List<MyObjectClass> docs = request.documents
   .map((doc) => MyObjectClass(doc.documentID, doc.data["..."], ....))
   .toList();
 ```
@@ -311,7 +658,7 @@ List<Tip> docs = request.documents
 await Firestore.instance.collection('mycollection').document(id).delete();
 ```
 
-### Update a document by id
+#### Update a document by id
 
 ``` dart
 await Firestore.instance.collection('mycollection').document(id).updateData({...});
@@ -341,6 +688,271 @@ service firebase.storage {
 
 </details>
 
+### Firebase storage - store images
+
+**Reference**: <https://www.c-sharpcorner.com/article/upload-image-file-to-firebase-storage-using-flutter>
+
+Dependencies: [cached_network_image](https://pub.dev/packages/cached_network_image), [image_picker](https://pub.dev/packages/image_picker), [firebase_storage](https://pub.dev/packages/firebase_storage)
+
+**NOTE**: This example use the firebase storage rule defined in the other section
+
+<details>
+<summary>lib/shared/file_storage.dart</summary>
+
+``` dart
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+import 'package:path/path.dart' as Path;
+
+class StorageRepository {
+  Future<Map<String, String>> uploadImage(File _image, String owner, String role) async {
+    if (role != "allowedRole") {
+      throw 'Not allowed';
+    }
+    String fileName = 'mydirectory/${Path.basename(_image.path)}';
+    StorageReference storageReference = FirebaseStorage.instance
+        .ref()
+        .child(fileName);
+    StorageUploadTask uploadTask = storageReference.putFile(
+      _image,
+      StorageMetadata(
+        customMetadata: <String, String>{'owner': owner, 'role': role},
+      ),
+    );
+    await uploadTask.onComplete;
+    String fileURL = await storageReference.getDownloadURL();
+    return {"fileUrl": fileURL, "fileName": fileName};
+  }
+
+  Future<void> deleteImage(String filename, String role) async {
+    if (role != "allowedRole") {
+      throw 'Not allowed';
+    }
+    final StorageReference firebaseStorageRef =
+        FirebaseStorage.instance.ref().child(filename);
+
+    await firebaseStorageRef.delete();
+    return true;
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>add image</summary>
+
+``` dart
+import 'package:image_picker/image_picker.dart'; // For Image Picker
+
+....
+// add the widgets (use a steteful class)
+                Text('Selected Image'),
+                _image != null
+                    ? Image.file(
+                        _image,
+                        height: 150,
+                      )
+                    : Container(/*height: 150*/),
+                _image == null
+                    ? RaisedButton(
+                        child: Text('Choose File'),
+                        onPressed: chooseFile,
+                        color: Colors.cyan,
+                      )
+                    : Container(),
+                _image != null
+                    ? RaisedButton(
+                        child: Text('Clear Selection'),
+                        onPressed: clearSelection,
+                      )
+                    : Container(),
+  ....
+
+  Future chooseFile() async {
+    await ImagePicker.pickImage(source: ImageSource.gallery).then((image) {
+      setState(() {
+        _image = image;
+      });
+    });
+  }
+
+  void clearSelection() {
+    setState(() {
+      _image = null;
+    });
+  }
+
+....
+  // call this function for upload
+  void _uploadImage() async {
+    ...
+    // upload image
+    if (_image != null) {
+      StorageRepository storageRepository = new StorageRepository();
+      Map fileInfo = await storageRepository.uploadImage(_image, userId, role);
+      String fileUrl = fileInfo["fileUrl"];
+      String fileName = fileInfo["fileName"];
+    }
+    ....
+  }
+
+```
+
+</details>
+
+<details>
+<summary>update/delete image</summary>
+
+``` dart
+import 'package:image_picker/image_picker.dart'; // For Image Picker
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+....
+// need a stateful widget
+
+  File _image;
+  bool _needToUpdateImage = false;
+  bool _isDeleted = false;
+  ...
+          Text('Selected Image'),
+          _image == null && _isDeleted == false
+              ? sharedWidgets.renderImage(fileUrl)
+              : Container(),
+          _image != null
+              ? Image.file(
+                  _image,
+                  height: 150,
+                )
+              : Container(/*height: 150*/),
+          _image == null
+              ? Row(children: <Widget>[
+                  RaisedButton(
+                    child: Text('Choose File'),
+                    onPressed: chooseFile,
+                    color: Colors.cyan,
+                  ),
+                  fileInfo["fileUrl"] != null
+                      ? RaisedButton(
+                          child: Text('Delete image'),
+                          onPressed: () {
+                            _confirmDelete(fileName);
+                          })
+                      : Container()
+                ])
+              : Container(),
+          _image != null
+              ? RaisedButton(
+                  child: Text('Clear Selection'),
+                  onPressed: clearSelection,
+                )
+              : Container(),
+....
+
+  Future chooseFile() async {
+    await ImagePicker.pickImage(source: ImageSource.gallery).then((image) {
+      setState(() {
+        _image = image;
+        _needToUpdateImage = true;
+      });
+    });
+  }
+
+  void clearSelection() {
+    setState(() {
+      _image = null;
+    });
+  }
+
+  void _confirmDelete(fileInfo) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // return object of type Dialog
+        return AlertDialog(
+          title: new Text("Confirm image delete"),
+          content: new Text("Are you sure?"),
+          actions: <Widget>[
+            // usually buttons at the bottom of the dialog
+            new FlatButton(
+              child: new Text("Close"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            new FlatButton(
+                child: new Text("Confirm"),
+                onPressed: () async {
+                  _deleteImage(fileInfo["fileName"]);
+                  Navigator.of(context).pop();
+                }),
+          ],
+        );
+      },
+    );
+  }
+
+
+  Future _deleteImage(fileInfo) async {
+    try {
+      ...
+      // delete image
+      StorageRepository storageRepository = new StorageRepository();
+      await storageRepository.deleteImage(fileInfo["fileName"], role);
+      // remove from cache: https://github.com/Baseflow/flutter_cache_manager
+      await DefaultCacheManager().removeFile(fileInfo["fileUrl"]);
+
+      setState(() {
+        _image = null;
+        _isDeleted = true;
+      });
+    } catch (e) {
+      ...
+    }
+  }
+
+  void _updateImage(fileInfo) async {
+    try {
+      ...
+      if (_needToUpdateImage) {
+        StorageRepository storageRepository = new StorageRepository();
+        // delete old image
+        await storageRepository.deleteImage(fileInfo["fileName"], role);
+        // remove from cache: https://github.com/Baseflow/flutter_cache_manager
+        await DefaultCacheManager().removeFile(fileInfo["fileUrl"]);
+        //  upload new image
+        Map<String, String> fileInfo =
+            await storageRepository.uploadImage(_image, userId, role);
+        String fileUrl = fileInfo["fileUrl"];
+        String fileName = fileInfo["fileName"];
+      }
+      ....
+    } catch (e) {
+      ....
+    }
+  }
+....
+
+```
+
+</details>
+
+<details>
+<summary>render image</summary>
+
+``` dart
+import 'package:cached_network_image/cached_network_image.dart';
+
+.....
+
+CachedNetworkImage(
+  imageUrl: imageUrl,
+  placeholder: (context, url) => CircularProgressIndicator(), // use circular progress when is loading
+  errorWidget: (context, url, error) => Icon(Icons.error),
+)
+```
+
+</details>
+
 ## MISC
 
 ### Upload a file on android emulator
@@ -351,6 +963,7 @@ mnt>sdcard is the location for SD card on the emulator.
 Right click on the folder and click Upload. See the image below.
 
 ### Dart class with optional parameter
+
 ``` dart
 class MyInfo {
   String id;
@@ -366,3 +979,4 @@ class MyInfo {
 MyInfo complete = myInfo("test", "test", optional: "test");
 MyInfo incomplete = myInfo("test1", "test1");
 ```
+
