@@ -530,6 +530,16 @@ Widget myTest() {
 }
 ```
 
+### Switch
+**Reference**: <https://stackoverflow.com/questions/53066664/flutter-android-preferencescreen-settings-page>
+``` dart
+SwitchListTile(
+  value: false,
+  title: Text("This is a SwitchPreference"),
+  onChanged: (value) {},
+),
+```
+
 ### Dialogs
 
 **Reference**: <https://medium.com/@nils.backe/flutter-alert-dialogs-9b0bb9b01d28>
@@ -663,6 +673,13 @@ await Firestore.instance.collection('mycollection').document(id).delete();
 ``` dart
 await Firestore.instance.collection('mycollection').document(id).updateData({...});
 ```
+
+#### Update with field remove
+
+``` dart
+await Firestore.instance.collection('mycollection').document(id).updateData({myUnusedField: FieldValue.delete(), ...});
+```
+
 
 ### Firebase storage - rule example
 
@@ -952,6 +969,10 @@ CachedNetworkImage(
 ```
 
 </details>
+
+### Firebase admin
+- Error: `function ignored because the firestore emulator does not exist or is not running.` Solution: change `serve` in `package.json` with: `npm run build && firebase serve --only functions,firestore`
+**Reference**: https://github.com/firebase/functions-samples/issues/572#issuecomment-504032472
 
 ## MISC
 
